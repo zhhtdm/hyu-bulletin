@@ -1,0 +1,6 @@
+bs4==0.0.2
+python-dotenv==1.1.0
+lzhaiofetcher==1.1
+lzhasyncemailsender==1.1
+lzhbaidutranslate==1.1
+pymongo==4.13.0
