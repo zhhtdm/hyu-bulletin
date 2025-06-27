@@ -105,7 +105,7 @@ async def task_hyu_oia():
         translated_titles = baidu_translate(BAIDU_APP_ID,BAIDU_APP_KEY,titles,from_lang="auto")
         async with mailing_list_lock:
             emails = mailing_list.copy()
-        
+
         for id, translated_title in zip(ids, translated_titles):
             logger.info(translated_title)
             await sender.send(
@@ -145,7 +145,7 @@ async def task_hyu_me():
         if not await is_service_active('hyu-me'):
             await asyncio.sleep(3)
             continue
-        url = 'https://me.hanyang.ac.kr/kor/notice/graduate__1.html'
+        url = 'https://me.hanyang.ac.kr/kor/notice/graduate__1.html#contents'
         content = await fetcher.fetch(url)
         if not content:
             logger.info('task hyu-me : error occurred')
@@ -166,7 +166,8 @@ async def task_hyu_me():
         for li in lis:
             a_tag = li.find("a", href=True)
             if a_tag:
-                id_match = re.search(r"uid=(\d+)", a_tag["href"])
+                a_href = a_tag["href"]
+                id_match = re.search(r"uid=(\d+)", a_href)
                 if id_match:
                     id = int(id_match.group(1))
                     subject_text = a_tag.get_text(strip=True)
@@ -175,10 +176,11 @@ async def task_hyu_me():
                         delete_items_len = delete_items_len + 1
                         continue
                     pub_date_value = li.find('div', class_='date').get_text(strip=True)
-                    
+
                     items[id] = {}
                     items[id]["datetime"] = pub_date_value
                     items[id]["title"] = subject_text
+                    items[id]["a_href"] = a_href
                 else :
                     logger.debug(f"hyu-me a标签内没有找到id: {li}")
             else :
@@ -205,7 +207,7 @@ async def task_hyu_me():
             await sender.send(
                 to = emails,
                 subject = f'''汉阳大机械工程系公告 - {items[id]['datetime']}''',
-                body = f'''<h2>{translated_title}</h2><a href = 'https://me.hanyang.ac.kr/front/bulletin/bulletinSub1/notice-view?id={id}' style="text-decoration:none;"><h2>{items[id]['title']}</h2></a>''',
+                body = f'''<h2>{translated_title}</h2><a href="{items[id]['a_href']}" style="text-decoration:none;"><h2>{items[id]['title']}</h2></a>''',
                 )
         hyu_me_ids.update(ids)
         new_docs = [{'_id':id} for id in ids]
@@ -241,7 +243,7 @@ async def handle_service_update(request):
                 collection = db["service"]
                 for	key, value in come.items():
                     # logger.info(value)
-                    if "isActive" not in value or not isinstance(value["isActive"],bool) or "qpd" not in value or not isinstance(value["qpd"],list) or len(value["qpd"])!=2 or not all(isinstance(i,int) for i in value["qpd"]): 
+                    if "isActive" not in value or not isinstance(value["isActive"],bool) or "qpd" not in value or not isinstance(value["qpd"],list) or len(value["qpd"])!=2 or not all(isinstance(i,int) for i in value["qpd"]):
                         go["message"]="error data"
                         go["type"]="error"
                         return web.json_response(go)
@@ -274,7 +276,7 @@ async def start_server():
 
     while True:
         await asyncio.sleep(3600)
-        
+
 async def service_setdefault(key, collection):
     global service
     async with service_lock:
@@ -317,7 +319,7 @@ async def main():
     logger.info(mailing_list)
     logger.info(len(hyu_me_ids))
     logger.info(len(hyu_oia_ids))
-    
+
     fetcher = AioFetcher()
     sender = AsyncEmailSender(SMTP_SERVER, SMTP_PORT, SMTP_EMAIL, SMTP_PASSWORD)
 
@@ -326,7 +328,7 @@ async def main():
         task_hyu_me(),
         task_hyu_oia(),
         )
-    
+
     await fetcher.close()
     await sender.stop()
 
